@@ -572,6 +572,8 @@ class CBinDiff:
                                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
 
     try:
+      print new_props
+      print len(new_props)
       cur.execute(sql, new_props)
     except:
       print prop

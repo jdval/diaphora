@@ -31,6 +31,7 @@ import difflib
 import sqlite3
 import traceback
 from hashlib import md5
+from collections import OrderedDict
 
 import diaphora
 
@@ -74,7 +75,8 @@ def block_succs(addr):
   except:
     print("NO BASIC BLOCK AT %s"%(addr))
     return res
-  bb = bb[0]
+  if bb is not None:
+    bb = bb[0]
   try:
     res.append(int(bb["jump"]))
   except:
@@ -516,6 +518,7 @@ class CIDABinDiff(diaphora.CBinDiff):
 
       print "PROPS FOR FUNC cur %s"%(func)
       props = self.read_function(func)
+      print "prop len ", len(props)
       if props == False:
         continue
 
@@ -1353,20 +1356,20 @@ or selecting Edit -> Plugins -> Diaphora - Show results""")
     keys = assembly.keys()
     keys.sort()
 
+    # Collect the ordered list of addresses, as shown in the assembly
+    # viewer (when diffing). It will be extremely useful for importing
+    # stuff later on.
+    assembly_addrs = []
+
     # After sorting our the addresses of basic blocks, be sure that the
     # very first address is always the entry point, no matter at what
     # address it is.
-    try:
-      keys.remove(f - image_base)
-    except:
-      pass
+    keys.remove(f - image_base)
     keys.insert(0, f - image_base)
     for key in keys:
-      try:
-        asm.extend(assembly[key])
-      except:
-        print sys.exc_info()[0].message
-        pass
+      for line in assembly[key]:
+        assembly_addrs.append(line[0])
+        asm.append(line[1])
     asm = "\n".join(asm)
 
     cc = edges - nodes + 2
@@ -1433,13 +1436,70 @@ or selecting Edit -> Plugins -> Diaphora - Show results""")
     seg_rva = x - SegStart(x)
 
     rva = f - self.get_base_address()
+
+    # TODO - fix these things
+    callers = []
+    callees = []
+
     return (name, nodes, edges, indegree, outdegree, size, instructions, mnems, names,
              proto, cc, prime, f, comment, true_name, bytes_hash, pseudo, pseudo_lines,
              pseudo_hash1, pseudocode_primes, function_flags, asm, proto2,
              pseudo_hash2, pseudo_hash3, len(strongly_connected), loops, rva, bb_topological,
              strongly_connected_spp, clean_assembly, clean_pseudo, mnemonics_spp, switches,
              function_hash, bytes_sum, md_index, constants, len(constants), seg_rva,
-             basic_blocks_data, bb_relations)
+            assembly_addrs,
+            callers, callees,
+            basic_blocks_data, bb_relations)
+             # basic_blocks_data, bb_relations)
+
+    # Returning just a list this big seems makes debugging other things difficult
+    # Maybe this would make things simpler?
+    # return OrderedDict(
+    #   [
+    #     ("name", name),
+    #     ("nodes", nodes),
+    #     ("edges", edges),
+    #     ("indegree", indegree),
+    #     ("outdegree", outdegree),
+    #     ("size", size),
+    #     ("instructions", instructions),
+    #     ("mnems", mnems),
+    #     ("names", names),
+    #     ("proto", proto),
+    #     ("cc", cc),
+    #     ("prime", prime),
+    #     ("f", f),
+    #     ("comment", comment),
+    #     ("true_name", true_name),
+    #     ("bytes_hash", bytes_hash),
+    #     ("pseudo", pseudo),
+    #     ("pseudo_lines", pseudo_lines),
+    #     ("pseudo_hash1", pseudo_hash1),
+    #     ("pseudocode_primes", pseudocode_primes),
+    #     ("function_flags", function_flags),
+    #     ("asm", asm),
+    #     ("proto2", proto2),
+    #     ("pseudo_hash2", pseudo_hash2),
+    #     ("pseudo_hash3", pseudo_hash3),
+    #     ("len(strongly_connected)", len(strongly_connected)),
+    #     ("loops", loops),
+    #     ("rva", rva),
+    #     ("bb_topological", bb_topological),
+    #     ("strongly_connected_spp", strongly_connected_spp),
+    #     ("clean_assembly", clean_assembly),
+    #     ("clean_pseudo", clean_pseudo),
+    #     ("mnemonics_spp", mnemonics_spp),
+    #     ("switches", switches),
+    #     ("function_hash", function_hash),
+    #     ("bytes_sum", bytes_sum),
+    #     ("md_index", md_index),
+    #     ("constants", constants),
+    #     ("len(constants)", len(constants)),
+    #     ("seg_rva", seg_rva),
+    #     ("basic_blocks_data", basic_blocks_data),
+    #     ("bb_relations", bb_relations)
+    #   ]
+    # )
 
   def get_base_address(self):
     return r2_get_imagebase()
@@ -1901,13 +1961,13 @@ def main():
 
   if os.path.exists(file_out):
     g_bindiff = None
-    if raw_input("Remove %s? "%(file_out))[0].lower() == "y":
-      os.unlink(file_out)
-      _diff_or_export(True)
-    else:
-      print("Please remove %s and run again"%(file_out))
-      r2.quit()
-      sys.exit(1)
+    # if raw_input("Remove %s? "%(file_out))[0].lower() == "y":
+    os.unlink(file_out)
+    _diff_or_export(True)
+    # else:
+    #   print("Please remove %s and run again"%(file_out))
+    #   r2.quit()
+    #   sys.exit(1)
   else:
     _diff_or_export(True)
   print("File created %s"%(file_out))
